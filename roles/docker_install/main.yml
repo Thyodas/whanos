@@ -1,0 +1,23 @@
+---
+- name: Debug
+  debug:
+    msg: "Installing Docker"
+  tags: docker
+
+- name: Install Docker
+  apt:
+    name: docker.io
+    state: present
+  tags: docker
+
+- name: Install Docker Compose
+  apt:
+    name: docker-compose
+    state: present
+  tags: docker
+
+- name: Pull the docker images
+  shell: docker pull {{ item }}
+  with_items:
+    - registry
+  tags: docker
