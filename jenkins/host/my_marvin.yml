@@ -1,0 +1,70 @@
+jenkins:
+  mode: NORMAL
+  authorizationStrategy:
+    roleBased:
+      roles:
+        global:
+          - name: "admin"
+            description: "Admin account"
+            permissions:
+              - "Overall/Administer"
+            entries:
+              - user: "admin"
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          name: "Admin"
+          password: "${readFile:${ADMIN_PASSWORD_FILE}}"
+
+  clouds:
+    - docker:
+        name: "docker"
+        exposeDockerHost: true
+        dockerApi:
+          dockerHost:
+            uri: "unix:///var/run/docker.sock"
+        templates:
+          - labelString: "java-docker-slave"
+            dockerTemplateBase:
+              image: "epitechcontent/epitest-docker:latest"
+            remoteFs: "/tmp"
+            connector: "attach"
+            instanceCapStr: "10"
+            retentionStrategy:
+              idleMinutes: 1
+
+unclassified:
+  githubpluginconfig:
+    configs:
+      - name: "Default Github server"
+        apiUrl: "https://api.github.com"
+        credentialsId: "github_token"
+        manageHooks: true
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - basicSSHUserPrivateKey:
+              scope: GLOBAL
+              id: github_ssh_key
+              username: Thyodas
+              description: "Github SSH Key to clone repositories"
+              privateKeySource:
+                directEntry:
+                  privateKey: "${readFile:${GITHUB_SSH_KEY_FILE}}"
+          - string:
+              scope: SYSTEM
+              id: "github_token"
+              secret: "${readFile:${GITHUB_TOKEN_FILE}}"
+              description: "Secret Github Token to update commit statuses"
+
+security:
+  gitHostKeyVerificationConfiguration:
+    sshHostKeyVerificationStrategy: "acceptFirstConnectionStrategy"
+
+jobs:
+  - file: /job_dsl.groovy
