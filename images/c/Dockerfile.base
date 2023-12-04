@@ -1,0 +1,12 @@
+FROM gcc:13.2
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR /app
+
+# This section will be executed only if the image is used as a base image
+ONBUILD COPY . /app
+ONBUILD RUN make
+ONBUILD RUN cp ./compiled-app /tmp/compiled-app
+ONBUILD RUN rm -dfr /app/*
+ONBUILD RUN cp /tmp/compiled-app /app/compiled-app
+ONBUILD CMD ["./compiled-app"]
