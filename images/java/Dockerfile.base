@@ -1,0 +1,24 @@
+FROM openjdk:21-jdk-slim-bullseye
+
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update && \
+    apt-get install -y maven && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# This section will be executed only if the image is used as a base image
+ONBUILD COPY ./app /app
+
+ONBUILD RUN mvn dependency:resolve
+ONBUILD RUN mvn package
+ONBUILD RUN cp ./target/app.jar /tmp/app.jar
+
+ONBUILD RUN rm -dfr * && \
+    apt-get purge -y maven && \
+    apt-get autoremove -y && \
+    rm -rf /root/.m2 /usr/share/maven /usr/share/maven/ref
+
+ONBUILD RUN cp /tmp/app.jar ./app.jar
+ONBUILD CMD ["java", "-jar", "target/app.jar"]

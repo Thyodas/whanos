@@ -1,0 +1,26 @@
+FROM openjdk:21-jdk-slim-bullseye
+
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update && \
+    apt-get install -y maven && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY ./app /app
+
+RUN mvn dependency:resolve
+
+RUN mvn package
+
+RUN cp ./target/app.jar /tmp/app.jar
+
+RUN rm -dfr * && \
+    apt-get purge -y maven && \
+    apt-get autoremove -y && \
+    rm -rf /root/.m2 /usr/share/maven /usr/share/maven/ref
+
+RUN cp /tmp/app.jar ./app.jar
+
+CMD ["java", "-jar", "app.jar"]
