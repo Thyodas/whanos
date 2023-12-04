@@ -1,0 +1,42 @@
+#!/bin/bash
+
+detect_c() {
+    [ -f "Makefile" ] && echo "c"
+}
+
+detect_java() {
+    [ -f "app/pom.xml" ] && echo "java"
+}
+
+detect_javascript() {
+    [ -f "package.json" ] && echo "javascript"
+}
+
+detect_python() {
+    [ -f "requirements.txt" ] && echo "python"
+}
+
+detect_befunge() {
+    [ -f "app/main.bf" ] && echo "befunge"
+}
+
+if [ -z "$(ls -A "$1")" ]; then
+    echo "Folder is empty"
+    exit 84
+fi
+
+cd "$1"
+
+# Detect the language
+language=""
+for detector in detect_c detect_java detect_javascript detect_python detect_befunge; do
+    language="$($detector)"
+    [ -n "$language" ] && break
+done
+
+if [ -n "$language" ]; then
+    echo "$language"
+else
+    echo "Unsupported language"
+    exit 84
+fi
