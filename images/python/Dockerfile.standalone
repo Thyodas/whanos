@@ -1,0 +1,12 @@
+FROM python:3.12.0-bullseye
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR /app
+
+COPY . /app
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+RUN rm -rf /app/requirements.txt
+
+CMD ["python", "-m", "app"]

@@ -1,0 +1,12 @@
+# Base image
+FROM python:3.12.0-bullseye
+
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR /app
+
+# This section will be executed only if the image is used as a base image
+ONBUILD COPY . /app
+ONBUILD RUN pip install --no-cache-dir -r requirements.txt
+ONBUILD RUN rm -rf /app/requirements.txt
+ONBUILD CMD ["python", "-m", "app"]
