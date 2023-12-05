@@ -1,0 +1,133 @@
+---
+- name: "Whanos - 2023 - HEIN Guillaume & MERGEN Rémi: setup an autonomous Jenkins server to test and deploy the project"
+  become: true
+  gather_facts: false
+  hosts: all
+  vars:
+    jenkins_path: "/var/lib/jenkins"
+    registry_port: "5001"
+  tasks:
+    - name: Include vault
+      ansible.builtin.include_vars: vault.yml
+
+    - name: Populate service facts
+      ansible.builtin.service_facts:
+
+    - name: "Docker installation"
+      when: ansible_facts.services["docker.service"] is not defined or ansible_facts.services["docker.service"].state != "running"
+      tags: docker
+      block:
+        - name: "Upload Jenkins configuration"
+          ansible.builtin.copy:
+            src: "docker/daemon.json"
+            dest: "/etc/docker/"
+            owner: "master"
+            group: "master"
+            mode: "666"
+
+        - name: Install Docker
+          ansible.builtin.apt:
+            name: docker.io
+            state: present
+          tags: docker
+          timeout: 240
+          failed_when: false
+
+        - name: Start Docker
+          ansible.builtin.service:
+            name: docker
+            state: started
+            enabled: true
+          tags: docker
+
+        - name: "Install docker-compose"
+          ansible.builtin.apt:
+            name: docker-compose
+            state: present
+
+    - name: Pull the docker images
+      community.general.docker_image:
+        name: "registry"
+        source: pull
+        state: present
+      tags: docker
+
+    - name: "Run the registry container"
+      community.general.docker_container:
+        name: "registry"
+        image: "registry"
+        state: started
+        restart_policy: always
+        ports:
+          - "{{ registry_port }}:{{ registry_port }}"
+        volumes:
+          - "/var/lib/registry:/var/lib/registry"
+      tags: docker
+
+  # check is config is already upload
+    - name: "Check if Jenkins configuration is already uploaded"
+      ansible.builtin.stat:
+        path: "{{ jenkins_path }}/host/my_marvin.yml"
+      register: config_file
+      tags: jenkins
+
+    #   # stop playbook now
+    # - name: "Stop playbook"
+    #   ansible.builtin.meta: end_play
+    #   tags: jenkins
+
+    - name: "Upload Jenkins configuration"
+      when: config_file.stat.exists is false
+      block:
+        - name: "Upload Jenkins configuration"
+          ansible.builtin.copy:
+            src: "../jenkins/"
+            dest: "{{ jenkins_path }}"
+            owner: "jenkins"
+            group: "jenkins"
+            mode: "644"
+          tags: jenkins
+
+    - name: "Install Jenkins"
+      # when: ansible_facts.services["jenkins.service"] is not defined or ansible_facts.services["jenkins.service"].state != "running"
+      tags: jenkins
+      block:
+        - name: Install Java
+          ansible.builtin.apt:
+            name: openjdk-17-jdk
+            state: present
+
+        - name: Add the Jenkins repository key
+          ansible.builtin.apt_key:
+            url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+            state: present
+
+        - name: Add the Jenkins repository
+          ansible.builtin.apt_repository:
+            repo: deb https://pkg.jenkins.io/debian-stable binary/
+            state: present
+
+        - name: Install Jenkins
+          ansible.builtin.apt:
+            name: jenkins
+            state: present
+            update_cache: true
+
+        - name: Start Jenkins
+          ansible.builtin.service:
+            name: jenkins
+            state: restarted
+            enabled: true
+          environment:
+            JENKINS_HOME: "{{ jenkins_path }}"
+            ADMIN_PASSWORD: "{{ jenkins_admin_password }}"
+            GITHUB_SSH_KEY: "{{ jenkins_github_ssh_key }}"
+            GITHUB_TOKEN: "{{ jenkins_github_token }}"
+            REGISTRY_PORT: "{{ registry_port }}"
+
+
+    # - name: "Starting jenkins docker-compose with shell"
+    #   ansible.builtin.shell: |
+    #     cd {{ jenkins_path }}
+    #     docker-compose up -d --build
+    #   tags: jenkins

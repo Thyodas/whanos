@@ -17,7 +17,7 @@ jenkins:
       users:
         - id: "admin"
           name: "Admin"
-          password: "${readFile:${ADMIN_PASSWORD_FILE}}"
+          password: "${ADMIN_PASSWORD}"
 
   clouds:
     - docker:
@@ -55,11 +55,11 @@ credentials:
               description: "Github SSH Key to clone repositories"
               privateKeySource:
                 directEntry:
-                  privateKey: "${readFile:${GITHUB_SSH_KEY_FILE}}"
+                  privateKey: "${GITHUB_SSH_KEY}"
           - string:
               scope: SYSTEM
               id: "github_token"
-              secret: "${readFile:${GITHUB_TOKEN_FILE}}"
+              secret: "${GITHUB_TOKEN}"
               description: "Secret Github Token to update commit statuses"
 
 security:

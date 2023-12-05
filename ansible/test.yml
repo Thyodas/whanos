@@ -1,0 +1,12 @@
+---
+- name: Testing ansible vault
+  become: true
+  gather_facts: false
+  hosts: localhost
+  tasks:
+    - name: Include vault
+      include_vars: vault.yml
+
+    - name: Testing ansible vault
+      debug:
+        msg: "Testing ansible vault: {{ mypass }}"

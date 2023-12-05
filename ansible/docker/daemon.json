@@ -1,0 +1,3 @@
+{
+    "insecure-registry": ["localhost:5000"]
+}
