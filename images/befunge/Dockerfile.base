@@ -1,0 +1,12 @@
+FROM gcc:13.2
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR /app
+
+# Befunge interpreter compilation
+RUN curl -o bef.c https://git.catseye.tc/Befunge-93/raw/master/src/bef.c
+RUN gcc -o bef bef.c
+RUN rm -f bef.c
+
+ONBUILD COPY ./app/main.bf ./main.bf
+ONBUILD CMD ["./bef", "-q", "main.bf"]

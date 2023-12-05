@@ -1,0 +1,10 @@
+FROM node:20.9.0-bullseye
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR /app
+
+COPY . /app
+
+RUN npm install
+
+CMD ["node", "."]
