@@ -17,6 +17,8 @@ services:
       BUILDER_PASSWORD_FILE: /run/secrets/builder_password
       GITHUB_TOKEN_FILE: /run/secrets/github_token
       GITHUB_SSH_KEY_FILE: /run/secrets/github_ssh_key
+      DOCKER_HOST: "unix:///var/run/docker.sock"
+      DOCKER_REPOSITORY_HOST: "localhost:5001"
     secrets:
       - admin_password
       - builder_password

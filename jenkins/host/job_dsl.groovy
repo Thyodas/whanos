@@ -9,11 +9,29 @@ folder ('Projects') {
 languages = ["c", "java", "javascript", "python", "befunge"]
 
 languages.each { language ->
-	freeStyleJob("Whanos base images/whanos-$language") {
-		steps {
-			shell("echo 'Hello $language!'")
-		}
-	}
+    freeStyleJob("Whanos base images/whanos-$language") {
+        label("image-builder")
+        def path = "/app/images/$language/Dockerfile.base"
+        def build_path = "/app/to_build"
+
+        steps {
+            shell("mkdir $build_path && cp $path $build_path/Dockerfile")
+            dockerBuilderPublisher {
+                dockerFileDirectory("$build_path")
+                cloud("docker")
+                fromRegistry {
+                    url("")
+                    credentialsId("")
+                }
+                tagsString("localhost:5001/whanos-$language:\$BUILD_NUMBER")
+                pushOnSuccess(true)
+                pushCredentialsId("")
+                cleanImages(false)
+                cleanupWithJenkinsJobDelete(false)
+                pull(true)
+            }
+        }
+    }
 }
 
 freeStyleJob("Whanos base images/Build all base images") {
@@ -25,13 +43,38 @@ freeStyleJob("Whanos base images/Build all base images") {
 }
 
 freeStyleJob('link-project') {
+    label("image-builder")
     parameters {
+        stringParam('GITHUB_NAME', null, 'GitHub repository owner/repo_name (e.g.: "EpitechIT31000/chocolatine")')
         stringParam('DISPLAY_NAME', '', 'Display name of the project')
         stringParam('DESCRIPTION', '', 'Description of the project')
     }
     steps {
         dsl {
-            external('./link_project.groovy')
+            text('''
+                freeStyleJob("Projects/\$DISPLAY_NAME") {
+                label("image-builder")
+                description("\$DESCRIPTION")
+                properties {
+                    githubProjectUrl("https://github.com/\$GITHUB_NAME")
+                }
+                scm {
+                    git {
+                        remote {
+                            github("\$GITHUB_NAME", 'ssh')
+                            credentials('github_ssh_key')
+                        }
+                    }
+                }
+                triggers {
+                    scm("* * * * *")
+                }
+                steps {
+                    shell("/app/detect-language `pwd`")
+                }
+            }
+
+            ''')
         }
     }
 }

@@ -27,9 +27,9 @@ jenkins:
           dockerHost:
             uri: "unix:///var/run/docker.sock"
         templates:
-          - labelString: "java-docker-slave"
+          - labelString: "image-builder"
             dockerTemplateBase:
-              image: "epitechcontent/epitest-docker:latest"
+              image: "localhost:5001/whanos-agent:latest"
             remoteFs: "/tmp"
             connector: "attach"
             instanceCapStr: "10"
