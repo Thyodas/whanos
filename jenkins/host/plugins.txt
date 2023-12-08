@@ -11,3 +11,5 @@ role-strategy:latest
 docker-plugin:latest
 ws-cleanup:latest
 build-timeout:latest
+conditional-buildstep:latest
+envinject:latest

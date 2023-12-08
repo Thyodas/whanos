@@ -23,7 +23,7 @@ languages.each { language ->
                     url("")
                     credentialsId("")
                 }
-                tagsString("localhost:5001/whanos-$language:\$BUILD_NUMBER")
+                tagsString("localhost:5001/whanos-$language:latest")
                 pushOnSuccess(true)
                 pushCredentialsId("")
                 cleanImages(false)
@@ -67,10 +67,39 @@ freeStyleJob('link-project') {
                     }
                 }
                 triggers {
-                    scm("* * * * *")
+                    scm("H * * * *")
                 }
                 steps {
-                    shell("/app/detect-language `pwd`")
+                    shell("echo DETECTED_LANGUAGE=`/app/detect-language .` >> /app/env")
+                    environmentVariables {
+                        propertiesFile('/app/env')
+                    }
+
+                    conditionalSteps {
+                        condition {
+                            not {
+                                fileExists('Dockerfile', BaseDir.WORKSPACE)
+                            }
+                        }
+                        steps {
+                            shell("cp /app/images/\\$DETECTED_LANGUAGE/Dockerfile.standalone Dockerfile")
+                        }
+                    }
+
+                    dockerBuilderPublisher {
+                        dockerFileDirectory(".")
+                        cloud("docker")
+                        fromRegistry {
+                            url("localhost:5001")
+                            credentialsId("")
+                        }
+                        tagsString("localhost:5001/whanos-\$DISPLAY_NAME-\\$DETECTED_LANGUAGE:\\$BUILD_NUMBER")
+                        pushOnSuccess(true)
+                        pushCredentialsId("")
+                        cleanImages(false)
+                        cleanupWithJenkinsJobDelete(false)
+                        pull(true)
+                    }
                 }
             }
 
