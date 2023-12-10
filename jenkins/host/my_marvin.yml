@@ -1,5 +1,6 @@
 jenkins:
   mode: NORMAL
+  numExecutors: 0
   authorizationStrategy:
     roleBased:
       roles:
@@ -56,15 +57,10 @@ credentials:
               privateKeySource:
                 directEntry:
                   privateKey: "${readFile:${GITHUB_SSH_KEY_FILE}}"
-          - string:
-              scope: SYSTEM
-              id: "github_token"
-              secret: "${readFile:${GITHUB_TOKEN_FILE}}"
-              description: "Secret Github Token to update commit statuses"
 
 security:
   gitHostKeyVerificationConfiguration:
     sshHostKeyVerificationStrategy: "acceptFirstConnectionStrategy"
 
 jobs:
-  - file: /job_dsl.groovy
+  - file: "${JENKINS_HOME}/host/job_dsl.groovy"

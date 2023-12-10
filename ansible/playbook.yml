@@ -17,14 +17,6 @@
       when: ansible_facts.services["docker.service"] is not defined or ansible_facts.services["docker.service"].state != "running"
       tags: docker
       block:
-        - name: "Upload Jenkins configuration"
-          ansible.builtin.copy:
-            src: "docker/daemon.json"
-            dest: "/etc/docker/"
-            owner: "master"
-            group: "master"
-            mode: "666"
-
         - name: Install Docker
           ansible.builtin.apt:
             name: docker.io
@@ -32,6 +24,14 @@
           tags: docker
           timeout: 240
           failed_when: false
+
+        - name: "Upload daemon.json template"
+          ansible.builtin.template:
+            src: "docker/daemon.json.j2"
+            dest: "/etc/docker/daemon.json"
+            owner: "root"
+            group: "root"
+            mode: "644"
 
         - name: Start Docker
           ansible.builtin.service:
@@ -47,21 +47,31 @@
 
     - name: Pull the docker images
       community.general.docker_image:
-        name: "registry"
+        name: "registry:2"
         source: pull
         state: present
       tags: docker
 
     - name: "Run the registry container"
       community.general.docker_container:
-        name: "registry"
-        image: "registry"
+        name: "whanos-registry"
+        image: "registry:2"
+        volumes:
+          - "/var/lib/registry:/var/lib/registry"
         state: started
         restart_policy: always
         ports:
-          - "{{ registry_port }}:{{ registry_port }}"
-        volumes:
-          - "/var/lib/registry:/var/lib/registry"
+          - "{{ registry_port }}:5000"
+      tags: docker
+
+    - name: "Create Jenkins Agent docker image"
+      community.general.docker_image:
+        name: "localhost:{{ registry_port }}/whanos-agent:latest"
+        push: true
+        source: build
+        build:
+          path: "../jenkins/agents"
+          pull: true
       tags: docker
 
   # check is config is already upload
@@ -76,17 +86,17 @@
     #   ansible.builtin.meta: end_play
     #   tags: jenkins
 
-    - name: "Upload Jenkins configuration"
-      when: config_file.stat.exists is false
-      block:
-        - name: "Upload Jenkins configuration"
-          ansible.builtin.copy:
-            src: "../jenkins/"
-            dest: "{{ jenkins_path }}"
-            owner: "jenkins"
-            group: "jenkins"
-            mode: "644"
-          tags: jenkins
+    # - name: "Upload Jenkins configuration"
+    #   when: config_file.stat.exists is false
+    #   block:
+    #     - name: "Upload Jenkins configuration"
+    #       ansible.builtin.copy:
+    #         src: "../jenkins/"
+    #         dest: "{{ jenkins_path }}"
+    #         owner: "jenkins"
+    #         group: "jenkins"
+    #         mode: "644"
+    #       tags: jenkins
 
     - name: "Install Jenkins"
       # when: ansible_facts.services["jenkins.service"] is not defined or ansible_facts.services["jenkins.service"].state != "running"
@@ -113,6 +123,63 @@
             state: present
             update_cache: true
 
+        - name: Add jenkins user to docker group
+          ansible.builtin.command:
+            cmd: "sudo usermod -a -G docker jenkins"
+          become: true
+          tags: docker
+
+        - name: "Upload Jenkins configuration"
+          ansible.builtin.copy:
+            src: "../jenkins/"
+            dest: "{{ jenkins_path }}"
+            owner: "jenkins"
+            group: "jenkins"
+            mode: "644"
+          tags: jenkins
+
+        - name: "Upload admin password"
+          ansible.builtin.copy:
+            content: "{{ jenkins_admin_password }}"
+            dest: "{{ jenkins_path }}/secrets/admin_password"
+            owner: "jenkins"
+            group: "jenkins"
+            mode: "440"
+
+        - name: "Upload github ssh key"
+          ansible.builtin.copy:
+            content: "{{ jenkins_github_ssh_key }}"
+            dest: "{{ jenkins_path }}/secrets/github_ssh_key"
+            owner: "jenkins"
+            group: "jenkins"
+            mode: "440"
+
+        - name: "Install Jenkins Plugins using Plugin Installation Manager"
+          ansible.builtin.shell: |
+            wget https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.12.14/jenkins-plugin-manager-2.12.14.jar -O {{ jenkins_path }}/jenkins-plugin-manager.jar
+            java -jar {{ jenkins_path }}/jenkins-plugin-manager.jar --plugin-file {{ jenkins_path }}/host/plugins.txt --plugin-download-directory  {{ jenkins_path }}/plugins/
+          tags: jenkins
+          become: true
+          become_user: jenkins
+
+        - name: Create Jenkins service drop-in directory
+          ansible.builtin.file:
+            path: "/etc/systemd/system/jenkins.service.d/"
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+          tags: jenkins
+
+        - name: "Setup jenkins service conf"
+          ansible.builtin.template:
+            src: "jenkins/override.conf.j2"
+            dest: "/etc/systemd/system/jenkins.service.d/override.conf"
+            owner: root
+            group: root
+            mode: '0644'
+          tags: jenkins
+
         - name: Start Jenkins
           ansible.builtin.service:
             name: jenkins
@@ -120,10 +187,11 @@
             enabled: true
           environment:
             JENKINS_HOME: "{{ jenkins_path }}"
-            ADMIN_PASSWORD: "{{ jenkins_admin_password }}"
-            GITHUB_SSH_KEY: "{{ jenkins_github_ssh_key }}"
-            GITHUB_TOKEN: "{{ jenkins_github_token }}"
+            CASC_JENKINS_CONFIG: "{{ jenkins_path }}/host/my_marvin.yml"
+            ADMIN_PASSWORD_FILE: "{{ jenkins_path }}/secrets/admin_password"
+            GITHUB_SSH_KEY_FILE: "{{ jenkins_path }}/secrets/github_ssh_key"
             REGISTRY_PORT: "{{ registry_port }}"
+            DOCKER_OPTS: "--insecure-registry=localhost:{{ registry_port }}"
 
 
     # - name: "Starting jenkins docker-compose with shell"
