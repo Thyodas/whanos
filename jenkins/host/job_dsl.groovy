@@ -23,7 +23,7 @@ languages.each { language ->
                     url("")
                     credentialsId("")
                 }
-                tagsString("localhost:5001/whanos-$language:latest")
+                tagsString("localhost:5001/library/whanos-$language:latest") // /library/ to later be able to pull without specifying the registry
                 pushOnSuccess(true)
                 pushCredentialsId("")
                 cleanImages(false)
@@ -93,7 +93,7 @@ freeStyleJob('link-project') {
                             url("localhost:5001")
                             credentialsId("")
                         }
-                        tagsString("localhost:5001/whanos-\$DISPLAY_NAME-\\$DETECTED_LANGUAGE:\\$BUILD_NUMBER")
+                        tagsString("localhost:5001/whanos-\$DISPLAY_NAME-project:latest")
                         pushOnSuccess(true)
                         pushCredentialsId("")
                         cleanImages(false)

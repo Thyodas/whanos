@@ -64,22 +64,36 @@
           - "{{ registry_port }}:5000"
       tags: docker
 
+    - name: Create a temporary directory in /tmp for agents build
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "_agents_build"
+      register: agents_temp_dir
+
+    - name: Copy agents docker related files to the temporary directory
+      ansible.builtin.copy:
+        src: "../images/"
+        dest: "{{ agents_temp_dir.path }}/images/"
+
+    - name: Copy agents script to the temporary directory
+      ansible.builtin.copy:
+        src: "../jenkins/detect-language"
+        dest: "{{ agents_temp_dir.path }}/jenkins/"
+
+    - name: Copy agents build related files to the temporary directory
+      ansible.builtin.copy:
+        src: "../jenkins/agents/Dockerfile"
+        dest: "{{ agents_temp_dir.path }}/"
+
     - name: "Create Jenkins Agent docker image"
       community.general.docker_image:
         name: "localhost:{{ registry_port }}/whanos-agent:latest"
         push: true
         source: build
         build:
-          path: "../jenkins/agents"
+          path: "{{ agents_temp_dir.path }}"
           pull: true
       tags: docker
-
-  # check is config is already upload
-    - name: "Check if Jenkins configuration is already uploaded"
-      ansible.builtin.stat:
-        path: "{{ jenkins_path }}/host/my_marvin.yml"
-      register: config_file
-      tags: jenkins
 
     #   # stop playbook now
     # - name: "Stop playbook"
@@ -179,6 +193,14 @@
             group: root
             mode: '0644'
           tags: jenkins
+
+        # - name: Add Docker registry to Jenkins config
+        #   ansible.builtin.lineinfile:
+        #     path: "/etc/default/jenkins"
+        #     regexp: "^DOCKER_OPTS="
+        #     line: "DOCKER_OPTS=\"--insecure-registry localhost:{{ registry_port }}\""
+        #     create: yes
+        #   become: true
 
         - name: Start Jenkins
           ansible.builtin.service:
