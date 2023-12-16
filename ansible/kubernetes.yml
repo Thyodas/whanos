@@ -1,0 +1,49 @@
+---
+- name: "Install kubernetes"
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Add kubernetes apt-key
+      ansible.builtin.apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+
+    - name: Add kubernetes apt repository
+      ansible.builtin.apt_repository:
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+
+    - name: "Disable swap"
+      ansible.builtin.command: swapoff -a
+      when: ansible_swaptotal_mb > 0
+      changed_when: ansible_swaptotal_mb > 0
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name: "{{ packages }}"
+        state: present
+      vars:
+        packages:
+          - docker
+          - kubelet
+          - kubeadm
+          - kubectl
+          - kubernetes-cni
+
+    - name: Enable and start docker service
+      ansible.builtin.service:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Enable and start kubelet service
+      ansible.builtin.service:
+        name: kubelet
+        enabled: true
+        state: started
+
+    # - name: "Initialize kubernetes cluster"
+    #   ansible.builtin.command: kubeadm init --pod-network-cidr=127.0.0.1/16
+    #   register: kubeadm_init
+    #   changed_when: false

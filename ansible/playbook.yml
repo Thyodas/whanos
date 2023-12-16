@@ -12,212 +12,207 @@
 
     - name: Populate service facts
       ansible.builtin.service_facts:
+      when: true
 
-    - name: "Docker installation"
-      when: ansible_facts.services["docker.service"] is not defined or ansible_facts.services["docker.service"].state != "running"
-      tags: docker
+    - name: "Validated steps"
+      when: true
       block:
-        - name: Install Docker
-          ansible.builtin.apt:
-            name: docker.io
+        - name: "Docker installation"
+          when: ansible_facts.services["docker.service"] is not defined or ansible_facts.services["docker.service"].state != "running"
+          tags: docker
+          block:
+            - name: Install Docker
+              ansible.builtin.apt:
+                name: docker.io
+                state: present
+              tags: docker
+              timeout: 240
+              failed_when: false
+
+            - name: "Upload daemon.json template"
+              ansible.builtin.template:
+                src: "docker/daemon.json.j2"
+                dest: "/etc/docker/daemon.json"
+                owner: "root"
+                group: "root"
+                mode: "644"
+
+            - name: Start Docker
+              ansible.builtin.service:
+                name: docker
+                state: started
+                enabled: true
+              tags: docker
+
+            - name: "Install docker-compose"
+              ansible.builtin.apt:
+                name: docker-compose
+                state: present
+
+        - name: Pull the docker images
+          community.general.docker_image:
+            name: "registry:2"
+            source: pull
             state: present
           tags: docker
-          timeout: 240
-          failed_when: false
 
-        - name: "Upload daemon.json template"
-          ansible.builtin.template:
-            src: "docker/daemon.json.j2"
-            dest: "/etc/docker/daemon.json"
-            owner: "root"
-            group: "root"
-            mode: "644"
-
-        - name: Start Docker
-          ansible.builtin.service:
-            name: docker
+        - name: "Run the registry container"
+          community.general.docker_container:
+            name: "whanos-registry"
+            image: "registry:2"
+            volumes:
+              - "/var/lib/registry:/var/lib/registry"
             state: started
-            enabled: true
+            restart_policy: always
+            ports:
+              - "{{ registry_port }}:5000"
           tags: docker
 
-        - name: "Install docker-compose"
-          ansible.builtin.apt:
-            name: docker-compose
-            state: present
-
-    - name: Pull the docker images
-      community.general.docker_image:
-        name: "registry:2"
-        source: pull
-        state: present
-      tags: docker
-
-    - name: "Run the registry container"
-      community.general.docker_container:
-        name: "whanos-registry"
-        image: "registry:2"
-        volumes:
-          - "/var/lib/registry:/var/lib/registry"
-        state: started
-        restart_policy: always
-        ports:
-          - "{{ registry_port }}:5000"
-      tags: docker
-
-    - name: Create a temporary directory in /tmp for agents build
-      ansible.builtin.tempfile:
-        state: directory
-        suffix: "_agents_build"
-      register: agents_temp_dir
-
-    - name: Copy agents docker related files to the temporary directory
-      ansible.builtin.copy:
-        src: "../images/"
-        dest: "{{ agents_temp_dir.path }}/images/"
-
-    - name: Copy agents script to the temporary directory
-      ansible.builtin.copy:
-        src: "../jenkins/detect-language"
-        dest: "{{ agents_temp_dir.path }}/jenkins/"
-
-    - name: Copy agents build related files to the temporary directory
-      ansible.builtin.copy:
-        src: "../jenkins/agents/Dockerfile"
-        dest: "{{ agents_temp_dir.path }}/"
-
-    - name: "Create Jenkins Agent docker image"
-      community.general.docker_image:
-        name: "localhost:{{ registry_port }}/whanos-agent:latest"
-        push: true
-        source: build
-        build:
-          path: "{{ agents_temp_dir.path }}"
-          pull: true
-      tags: docker
-
-    #   # stop playbook now
-    # - name: "Stop playbook"
-    #   ansible.builtin.meta: end_play
-    #   tags: jenkins
-
-    # - name: "Upload Jenkins configuration"
-    #   when: config_file.stat.exists is false
-    #   block:
-    #     - name: "Upload Jenkins configuration"
-    #       ansible.builtin.copy:
-    #         src: "../jenkins/"
-    #         dest: "{{ jenkins_path }}"
-    #         owner: "jenkins"
-    #         group: "jenkins"
-    #         mode: "644"
-    #       tags: jenkins
-
-    - name: "Install Jenkins"
-      # when: ansible_facts.services["jenkins.service"] is not defined or ansible_facts.services["jenkins.service"].state != "running"
-      tags: jenkins
-      block:
-        - name: Install Java
-          ansible.builtin.apt:
-            name: openjdk-17-jdk
-            state: present
-
-        - name: Add the Jenkins repository key
-          ansible.builtin.apt_key:
-            url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
-            state: present
-
-        - name: Add the Jenkins repository
-          ansible.builtin.apt_repository:
-            repo: deb https://pkg.jenkins.io/debian-stable binary/
-            state: present
-
-        - name: Install Jenkins
-          ansible.builtin.apt:
-            name: jenkins
-            state: present
-            update_cache: true
-
-        - name: Add jenkins user to docker group
-          ansible.builtin.command:
-            cmd: "sudo usermod -a -G docker jenkins"
-          become: true
-          tags: docker
-
-        - name: "Upload Jenkins configuration"
-          ansible.builtin.copy:
-            src: "../jenkins/"
-            dest: "{{ jenkins_path }}"
-            owner: "jenkins"
-            group: "jenkins"
-            mode: "644"
-          tags: jenkins
-
-        - name: "Upload admin password"
-          ansible.builtin.copy:
-            content: "{{ jenkins_admin_password }}"
-            dest: "{{ jenkins_path }}/secrets/admin_password"
-            owner: "jenkins"
-            group: "jenkins"
-            mode: "440"
-
-        - name: "Upload github ssh key"
-          ansible.builtin.copy:
-            content: "{{ jenkins_github_ssh_key }}"
-            dest: "{{ jenkins_path }}/secrets/github_ssh_key"
-            owner: "jenkins"
-            group: "jenkins"
-            mode: "440"
-
-        - name: "Install Jenkins Plugins using Plugin Installation Manager"
-          ansible.builtin.shell: |
-            wget https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.12.14/jenkins-plugin-manager-2.12.14.jar -O {{ jenkins_path }}/jenkins-plugin-manager.jar
-            java -jar {{ jenkins_path }}/jenkins-plugin-manager.jar --plugin-file {{ jenkins_path }}/host/plugins.txt --plugin-download-directory  {{ jenkins_path }}/plugins/
-          tags: jenkins
-          become: true
-          become_user: jenkins
-
-        - name: Create Jenkins service drop-in directory
-          ansible.builtin.file:
-            path: "/etc/systemd/system/jenkins.service.d/"
+        - name: Create a temporary directory in /tmp for agents build
+          ansible.builtin.tempfile:
             state: directory
-            owner: root
-            group: root
-            mode: '0755'
+            suffix: "_agents_build"
+          register: agents_temp_dir
+
+        - name: Copy agents docker related files to the temporary directory
+          ansible.builtin.copy:
+            src: "../images/"
+            dest: "{{ agents_temp_dir.path }}/images/"
+
+        - name: Copy agents script to the temporary directory
+          ansible.builtin.copy:
+            src: "../jenkins/detect-language"
+            dest: "{{ agents_temp_dir.path }}/jenkins/"
+
+        - name: Copy agents build related files to the temporary directory
+          ansible.builtin.copy:
+            src: "../jenkins/agents/Dockerfile"
+            dest: "{{ agents_temp_dir.path }}/"
+
+        - name: "Create Jenkins Agent docker image"
+          community.general.docker_image:
+            name: "localhost:{{ registry_port }}/whanos-agent:latest"
+            push: true
+            source: build
+            build:
+              path: "{{ agents_temp_dir.path }}"
+              pull: true
+          tags: docker
+
+        - name: "Install Jenkins"
+          when: ansible_facts.services["jenkins.service"] is not defined or ansible_facts.services["jenkins.service"].state != "running"
           tags: jenkins
+          block:
+            - name: Install Java
+              ansible.builtin.apt:
+                name: openjdk-17-jdk
+                state: present
 
-        - name: "Setup jenkins service conf"
-          ansible.builtin.template:
-            src: "jenkins/override.conf.j2"
-            dest: "/etc/systemd/system/jenkins.service.d/override.conf"
-            owner: root
-            group: root
-            mode: '0644'
-          tags: jenkins
+            - name: Add the Jenkins repository key
+              ansible.builtin.apt_key:
+                url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+                state: present
 
-        # - name: Add Docker registry to Jenkins config
-        #   ansible.builtin.lineinfile:
-        #     path: "/etc/default/jenkins"
-        #     regexp: "^DOCKER_OPTS="
-        #     line: "DOCKER_OPTS=\"--insecure-registry localhost:{{ registry_port }}\""
-        #     create: yes
-        #   become: true
+            - name: Add the Jenkins repository
+              ansible.builtin.apt_repository:
+                repo: deb https://pkg.jenkins.io/debian-stable binary/
+                state: present
 
-        - name: Start Jenkins
-          ansible.builtin.service:
-            name: jenkins
-            state: restarted
-            enabled: true
-          environment:
-            JENKINS_HOME: "{{ jenkins_path }}"
-            CASC_JENKINS_CONFIG: "{{ jenkins_path }}/host/my_marvin.yml"
-            ADMIN_PASSWORD_FILE: "{{ jenkins_path }}/secrets/admin_password"
-            GITHUB_SSH_KEY_FILE: "{{ jenkins_path }}/secrets/github_ssh_key"
-            REGISTRY_PORT: "{{ registry_port }}"
-            DOCKER_OPTS: "--insecure-registry=localhost:{{ registry_port }}"
+            - name: Install Jenkins
+              ansible.builtin.apt:
+                name: jenkins
+                state: present
+                update_cache: true
 
+            - name: Check is Jenkins is already in the docker group
+              ansible.builtin.command:
+                cmd: "id -nG \"jenkins\" | grep -qw docker ; echo $?"
+              register: jenkins_in_docker_group
+              changed_when: false
+              failed_when: false
+              tags: jenkins
 
-    # - name: "Starting jenkins docker-compose with shell"
-    #   ansible.builtin.shell: |
-    #     cd {{ jenkins_path }}
-    #     docker-compose up -d --build
-    #   tags: jenkins
+            - name: Add jenkins user to docker group
+              ansible.builtin.command:
+                cmd: "sudo usermod -a -G docker jenkins"
+              become: true
+              when: jenkins_in_docker_group.stdout != "0"
+              changed_when: false
+              failed_when: false
+              tags: docker
+
+            - name: "Upload Jenkins configuration"
+              ansible.builtin.copy:
+                src: "../jenkins/"
+                dest: "{{ jenkins_path }}"
+                owner: "jenkins"
+                group: "jenkins"
+                mode: "644"
+              tags: jenkins
+
+            - name: "Upload admin password"
+              ansible.builtin.copy:
+                content: "{{ jenkins_admin_password }}"
+                dest: "{{ jenkins_path }}/secrets/admin_password"
+                owner: "jenkins"
+                group: "jenkins"
+                mode: "440"
+
+            - name: "Upload github ssh key"
+              ansible.builtin.copy:
+                content: "{{ jenkins_github_ssh_key }}"
+                dest: "{{ jenkins_path }}/secrets/github_ssh_key"
+                owner: "jenkins"
+                group: "jenkins"
+                mode: "440"
+
+            - name: "Install Jenkins Plugins using Plugin Installation Manager"
+              ansible.builtin.shell: |
+                wget https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.12.14/jenkins-plugin-manager-2.12.14.jar -O {{ jenkins_path }}/jenkins-plugin-manager.jar
+                java -jar {{ jenkins_path }}/jenkins-plugin-manager.jar --plugin-file {{ jenkins_path }}/host/plugins.txt --plugin-download-directory  {{ jenkins_path }}/plugins/
+              tags: jenkins
+              become: true
+              changed_when: false
+              become_user: jenkins
+
+            - name: Create Jenkins service drop-in directory
+              ansible.builtin.file:
+                path: "/etc/systemd/system/jenkins.service.d/"
+                state: directory
+                owner: root
+                group: root
+                mode: '0755'
+              tags: jenkins
+
+            - name: "Setup jenkins service conf"
+              ansible.builtin.template:
+                src: "jenkins/override.conf.j2"
+                dest: "/etc/systemd/system/jenkins.service.d/override.conf"
+                owner: root
+                group: root
+                mode: '0644'
+              tags: jenkins
+
+            - name: Restart Jenkins
+              when: false
+              ansible.builtin.service:
+                name: jenkins
+                state: restarted
+                enabled: true
+              environment:
+                JENKINS_HOME: "{{ jenkins_path }}"
+                CASC_JENKINS_CONFIG: "{{ jenkins_path }}/host/my_marvin.yml"
+                ADMIN_PASSWORD_FILE: "{{ jenkins_path }}/secrets/admin_password"
+                GITHUB_SSH_KEY_FILE: "{{ jenkins_path }}/secrets/github_ssh_key"
+                REGISTRY_PORT: "{{ registry_port }}"
+                DOCKER_OPTS: "--insecure-registry=localhost:{{ registry_port }}"
+
+    - name: "Check if kubectl is already installed"
+      ansible.builtin.stat:
+        path: "/usr/local/bin/kubectl"
+      register: kubectl_installed
+      tags: k8s
+
+- name: "Install kubernetes"
+  ansible.builtin.import_playbook: kubernetes.yml
+  when: not kubectl_installed.stat.exists
