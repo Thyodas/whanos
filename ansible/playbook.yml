@@ -76,16 +76,19 @@
 
         - name: Copy agents docker related files to the temporary directory
           ansible.builtin.copy:
+            mode: "666"
             src: "../images/"
             dest: "{{ agents_temp_dir.path }}/images/"
 
         - name: Copy agents script to the temporary directory
           ansible.builtin.copy:
+            mode: "666"
             src: "../jenkins/detect-language"
             dest: "{{ agents_temp_dir.path }}/jenkins/"
 
         - name: Copy agents build related files to the temporary directory
           ansible.builtin.copy:
+            mode: "666"
             src: "../jenkins/agents/Dockerfile"
             dest: "{{ agents_temp_dir.path }}/"
 
@@ -167,9 +170,19 @@
                 mode: "440"
 
             - name: "Install Jenkins Plugins using Plugin Installation Manager"
+              ansible.builtin.get_url:
+                url: "https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.12.14/jenkins-plugin-manager-2.12.14.jar"
+                dest: "{{ jenkins_path }}/jenkins-plugin-manager.jar"
+                mode: "766"
+              tags: jenkins
+              become: true
+              changed_when: false
+              become_user: jenkins
+
+            - name: "Install Jenkins Plugins using Plugin Installation Manager"
               ansible.builtin.shell: |
-                wget https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.12.14/jenkins-plugin-manager-2.12.14.jar -O {{ jenkins_path }}/jenkins-plugin-manager.jar
-                java -jar {{ jenkins_path }}/jenkins-plugin-manager.jar --plugin-file {{ jenkins_path }}/host/plugins.txt --plugin-download-directory  {{ jenkins_path }}/plugins/
+                "java -jar {{ jenkins_path }}/jenkins-plugin-manager.jar --plugin-file \
+                {{ jenkins_path }}/host/plugins.txt --plugin-download-directory  {{ jenkins_path }}/plugins/"
               tags: jenkins
               become: true
               changed_when: false
