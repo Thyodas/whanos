@@ -52,7 +52,7 @@ credentials:
           - basicSSHUserPrivateKey:
               scope: GLOBAL
               id: github_ssh_key
-              username: Thyodas
+              username: admin
               description: "Github SSH Key to clone repositories"
               privateKeySource:
                 directEntry:

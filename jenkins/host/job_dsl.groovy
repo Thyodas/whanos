@@ -100,6 +100,15 @@ freeStyleJob('link-project') {
                         cleanupWithJenkinsJobDelete(false)
                         pull(true)
                     }
+
+                    conditionalSteps {
+                        condition {
+                            fileExists('whanos.yml', BaseDir.WORKSPACE)
+                        }
+                        steps {
+                            shell("helm upgrade -if whanos.yml '\$DISPLAY_NAME' /app/helm/deployment --set image.image='whanos-\$DISPLAY_NAME-project' --set image.name='\$DISPLAY_NAME-name'")
+                        }
+                    }
                 }
             }
 
