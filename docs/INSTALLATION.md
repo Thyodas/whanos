@@ -31,9 +31,10 @@ This document provides instructions on how to install the necessary dependencies
     pip install ansible
     ```
 
-2. Store your vault password (be careful not to push it online!)
+2. Go in the ansible directory and Store your vault password (be careful not to push it online!)
 
     ```bash
+    cd ansible
     echo "your-vault-password" > ./ansible/password
     ```
 
@@ -80,7 +81,6 @@ This document provides instructions on how to install the necessary dependencies
 5. Run the playbook
 
     ```bash
-    cd ansible
     ansible-playbook -i inventory.yml playbook.yml --vault-password-file password
     ```
 

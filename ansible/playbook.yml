@@ -72,24 +72,28 @@
             state: directory
             suffix: "_agents_build"
           register: agents_temp_dir
+          changed_when: false
 
         - name: Copy agents docker related files to the temporary directory
           ansible.builtin.copy:
             mode: "666"
             src: "../images/"
             dest: "{{ agents_temp_dir.path }}/images/"
+          changed_when: false
 
         - name: Copy agents script to the temporary directory
           ansible.builtin.copy:
             mode: "666"
             src: "../jenkins/detect-language"
             dest: "{{ agents_temp_dir.path }}/jenkins/"
+          changed_when: false
 
         - name: Copy agents build related files to the temporary directory
           ansible.builtin.copy:
             mode: "666"
             src: "../jenkins/agents/Dockerfile"
             dest: "{{ agents_temp_dir.path }}/"
+          changed_when: false
 
         - name: "Create Jenkins Agent docker image"
           community.general.docker_image:
@@ -243,3 +247,6 @@
 - name: "Install kubernetes"
   ansible.builtin.import_playbook: kubernetes.yml
   when: not kubectl_installed.stat.exists
+
+# - name: "Starting kubernetes"
+#   ansible.builtin.import_playbook: kubespray.yml
