@@ -2,6 +2,8 @@
 - name: "Install kubernetes"
   hosts: all
   become: true
+  vars_files:
+    - vault.yml
   gather_facts: true
   tasks:
     - name: Add kubernetes apt-key
@@ -25,7 +27,6 @@
         state: present
       vars:
         packages:
-          - docker
           - kubelet
           - kubeadm
           - kubectl
@@ -47,3 +48,14 @@
     #   ansible.builtin.command: kubeadm init --pod-network-cidr=127.0.0.1/16
     #   register: kubeadm_init
     #   changed_when: false
+
+    - name: "Download helm install script"
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get_helm.sh
+        mode: 0755
+      changed_when: false
+
+    - name: "Install helm"
+      ansible.builtin.command: /tmp/get_helm.sh
+      changed_when: false

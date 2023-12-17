@@ -6,10 +6,9 @@
   vars:
     jenkins_path: "/var/lib/jenkins"
     registry_port: "5001"
+  vars_files:
+    - vault.yml
   tasks:
-    - name: Include vault
-      ansible.builtin.include_vars: vault.yml
-
     - name: Populate service facts
       ansible.builtin.service_facts:
       when: true
@@ -153,6 +152,14 @@
                 mode: "644"
               tags: jenkins
 
+            - name: "Create secrets directory"
+              ansible.builtin.file:
+                path: "{{ jenkins_path }}/secrets"
+                state: directory
+                owner: "jenkins"
+                group: "jenkins"
+                mode: "755"
+
             - name: "Upload admin password"
               ansible.builtin.copy:
                 content: "{{ jenkins_admin_password }}"
@@ -169,7 +176,16 @@
                 group: "jenkins"
                 mode: "440"
 
-            - name: "Install Jenkins Plugins using Plugin Installation Manager"
+            # - name: "Create Jenkins plugins directory"
+            #   ansible.builtin.file:
+            #     path: "{{ jenkins_path }}/plugins"
+            #     state: directory
+            #     owner: "jenkins"
+            #     group: "jenkins"
+            #     mode: "755"
+            #   tags: jenkins
+
+            - name: "Download Jenkins Plugin Installation Manager"
               ansible.builtin.get_url:
                 url: "https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.12.14/jenkins-plugin-manager-2.12.14.jar"
                 dest: "{{ jenkins_path }}/jenkins-plugin-manager.jar"
@@ -181,8 +197,7 @@
 
             - name: "Install Jenkins Plugins using Plugin Installation Manager"
               ansible.builtin.shell: |
-                "java -jar {{ jenkins_path }}/jenkins-plugin-manager.jar --plugin-file \
-                {{ jenkins_path }}/host/plugins.txt --plugin-download-directory  {{ jenkins_path }}/plugins/"
+                java -jar {{ jenkins_path }}/jenkins-plugin-manager.jar --plugin-file {{ jenkins_path }}/host/plugins.txt --plugin-download-directory {{ jenkins_path }}/plugins/
               tags: jenkins
               become: true
               changed_when: false
@@ -207,7 +222,6 @@
               tags: jenkins
 
             - name: Restart Jenkins
-              when: false
               ansible.builtin.service:
                 name: jenkins
                 state: restarted
