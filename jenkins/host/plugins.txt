@@ -13,3 +13,4 @@ ws-cleanup:latest
 build-timeout:latest
 conditional-buildstep:latest
 envinject:latest
+kubernetes-cli:latest

@@ -1,111 +1,42 @@
-# Install Ansible with pip
-First things first, make sure you have Python and pip installed. If not, install them.
+# Whanos Project
 
-```bash
-sudo apt update
-sudo apt install python3 python3-pip
-```
-Now, let's install Ansible using pip.
+Welcome to the Whanos project, a comprehensive DevOps solution designed to automatically deploy applications using a combination of Docker, Jenkins, Ansible, and Kubernetes. This project is an embodiment of advanced DevOps practices, integrating various technologies to create a powerful deployment pipeline.
 
-```bash
-pip3 install ansible
-```
-# Install Git
+## Project Overview
 
-You'll need Git to clone your GitHub repository.
+Whanos is a powerful entity in the realm of DevOps, symbolizing the pinnacle of automation and efficiency. This project revolves around setting up an infrastructure that leverages Docker for containerization, Jenkins for continuous integration and delivery, Ansible for configuration management, and Kubernetes for orchestration. The goal is to enable automatic deployment of applications into a Kubernetes cluster, triggered by a push to a Git repository.
 
-```bash
-sudo apt install git
-```
-# Clone the GitHub Repository
+## Key Features
 
-Navigate to the directory where you want to clone the repo and run:
+- **Automatic Deployment:** Streamlined process from code push to deployment.
+- **Multi-Language Support:** Compatible with C, Java, JavaScript, Python, and Befunge.
+- **Customizable Infrastructure:** Extensible and configurable to fit various deployment needs.
+- **Containerization and Orchestration:** Leverages Docker and Kubernetes for managing containerized applications.
+- **Continuous Integration:** Integrates with Jenkins for automated building and testing.
 
-```bash
-git clone https://github.com/EpitechPromo2026/B-CPP-500-STG-5-2-rtype-remi.mergen.git
-```
+## Getting Started
 
-# Create Ansible Inventory
-Create a file named inventory.ini:
+To get started with the Whanos project, follow the instructions provided in the `docs/INSTALLATION.md` file. This document contains detailed steps on setting up the necessary environment, tools, and components to get your Whanos infrastructure up and running.
 
+### Installation Guide
 
-```ini
-[your-server]
-your-server-ip ansible_ssh_user=your-ssh-user ansible_ssh_private_key_file=/path/to/your/private/key ansible_become_pass=your-sudo-password
-```
-Secure Sensitive Data with Ansible Vault
-# Create a Vault File
+Please refer to the [Installation Guide](docs/INSTALLATION.md) for detailed instructions on how to install and configure all the components of the Whanos project.
 
-```bash
-ansible-vault create vault.yml
-# Add Sensitive Data to Vault
-```
-Add your sensitive data to vault.yml:
+### Prerequisites
 
+- Access to a Kubernetes cluster
+- Familiarity with Docker and containerization concepts
+- Basic understanding of Jenkins and CI/CD pipelines
+- Knowledge of Ansible for configuration management
 
-```yaml
----
-database_password: your-secure-password
-api_key: your-api-key
-```
-Reference Vault Data in Playbook
+## Usage
 
-# Run the Ansible Playbook
-Now, run your playbook:
+Once you have set up your Whanos infrastructure, you can start deploying applications by:
 
-```bash
-ansible-playbook --ask-vault-pass playbook.yml -i inventory.ini
-```
-This will execute the tasks defined in your playbook on the specified hosts.
+1. Pushing your code to a configured Git repository.
+2. Ensuring your repository is Whanos-compatible based on the language-specific criteria.
+3. Observing the automatic deployment process initiated by Jenkins.
 
+## Support
 
-# How to Write an Ansible Playbook
-An Ansible playbook is a YAML file that defines a set of tasks to be executed on remote hosts. Each task represents a single action, such as installing a package, copying a file, or restarting a service. Let's break down the basic structure:
-
-## YAML Format:
-Ansible playbooks are written in YAML. YAML is a human-readable data serialization format. Ensure proper indentation as YAML relies on indentation to define the structure.
-
-## Play Definition:
-A playbook can have one or more plays. A play defines a set of tasks to be executed on a specific group of hosts. It typically consists of a name, a list of hosts, and a set of tasks.
-
-```yaml
----
-- name: My First Play
-  hosts: your-server
-  become: true
-
-  tasks:
-    # Tasks go here
-```
-## Tasks:
-Tasks are the building blocks of a playbook. Each task specifies a module to be executed on the remote host. Modules are Ansible's way of performing actions. Here's an example task:
-
-
-```yaml
-tasks:
-  - name: Update apt cache
-    apt:
-      update_cache: yes
-```
-In this task, the apt module is used to update the package cache on Debian-based systems.
-
-## Variables:
-Playbooks can use variables to make them more flexible and reusable. Variables can be defined at various levels, such as at the play or task level. Here's an example of using a variable:
-
-
-```yaml
----
-- name: Use Variable
-  hosts: your-server
-  become: true
-
-  vars:
-    app_name: myapp
-
-  tasks:
-    - name: Ensure the app directory exists
-      file:
-        path: /opt/{{ app_name }}
-        state: directory
-```
-In this example, the app_name variable is defined at the play level and then used in the task.
+For support, please open an issue in the repository, and a maintainer will assist you. For detailed inquiries or specific project setup help, refer to the `docs/` directory.

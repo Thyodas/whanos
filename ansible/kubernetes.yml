@@ -1,61 +1,55 @@
----
-- name: "Install kubernetes"
-  hosts: all
-  become: true
-  vars_files:
-    - vault.yml
-  gather_facts: true
-  tasks:
-    - name: Add kubernetes apt-key
-      ansible.builtin.apt_key:
-        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-        state: present
+- name: "Download helm install script"
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    dest: /tmp/get_helm.sh
+    mode: 0755
+  changed_when: false
 
-    - name: Add kubernetes apt repository
-      ansible.builtin.apt_repository:
-        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
-        state: present
+- name: "Install helm"
+  ansible.builtin.command: /tmp/get_helm.sh
+  changed_when: false
 
-    - name: "Disable swap"
-      ansible.builtin.command: swapoff -a
-      when: ansible_swaptotal_mb > 0
-      changed_when: ansible_swaptotal_mb > 0
+- name: "Check if namespace 'jenkins' already exists"
+  ansible.builtin.command: kubectl get namespace jenkins
+  ignore_errors: yes
+  changed_when: false
+  register: namespace_check
+  failed_when: "'NotFound' in namespace_check.stderr"
 
-    - name: Install required packages
-      ansible.builtin.apt:
-        name: "{{ packages }}"
-        state: present
-      vars:
-        packages:
-          - kubelet
-          - kubeadm
-          - kubectl
-          - kubernetes-cni
+- name: "Create namespace 'jenkins'"
+  ansible.builtin.command: kubectl create namespace jenkins
+  when: namespace_check is failed
+  changed_when: false
 
-    - name: Enable and start docker service
-      ansible.builtin.service:
-        name: docker
-        enabled: true
-        state: started
+- name: "Check if service account already exists"
+  ansible.builtin.command: kubectl get serviceaccount jenkins-agent --namespace jenkins
+  ignore_errors: yes
+  changed_when: false
+  failed_when: "'NotFound' in service_account_check.stderr"
+  register: service_account_check
 
-    - name: Enable and start kubelet service
-      ansible.builtin.service:
-        name: kubelet
-        enabled: true
-        state: started
+- name: "Create service account"
+  ansible.builtin.command: kubectl create serviceaccount jenkins-agent --namespace jenkins
+  changed_when: false
+  when: service_account_check is failed
 
-    # - name: "Initialize kubernetes cluster"
-    #   ansible.builtin.command: kubeadm init --pod-network-cidr=127.0.0.1/16
-    #   register: kubeadm_init
-    #   changed_when: false
+- name: "Check if cluster role binding already exists"
+  ansible.builtin.command: kubectl get clusterrolebinding jenkins-agent
+  ignore_errors: yes
+  changed_when: false
+  register: cluster_role_binding_check
+  failed_when: "'NotFound' in cluster_role_binding_check.stderr"
 
-    - name: "Download helm install script"
-      ansible.builtin.get_url:
-        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-        dest: /tmp/get_helm.sh
-        mode: 0755
-      changed_when: false
+- name: "Create cluster role binding"
+  ansible.builtin.command: kubectl create clusterrolebinding jenkins-agent --clusterrole cluster-admin --serviceaccount jenkins:jenkins-agent
+  changed_when: false
+  when: service_account_check is failed
 
-    - name: "Install helm"
-      ansible.builtin.command: /tmp/get_helm.sh
-      changed_when: false
+- name: "Create secret token"
+  ansible.builtin.command: kubectl create token jenkins-agent --namespace jenkins
+  changed_when: false
+  register: k8s_create_token
+
+- name: Set a token fact
+  set_fact:
+    create_k8s_token: "{{ k8s_create_token.stdout }}"

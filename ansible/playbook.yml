@@ -13,6 +13,9 @@
       ansible.builtin.service_facts:
       when: true
 
+    - name: "Install kubernetes tools"
+      ansible.builtin.include_tasks: kubernetes.yml
+
     - name: "Validated steps"
       when: true
       block:
@@ -88,6 +91,13 @@
             dest: "{{ agents_temp_dir.path }}/jenkins/"
           changed_when: false
 
+        - name: Copy agents helm related files to the temporary directory
+          ansible.builtin.copy:
+            mode: "666"
+            src: "../helm"
+            dest: "{{ agents_temp_dir.path }}/helm/"
+          changed_when: false
+
         - name: Copy agents build related files to the temporary directory
           ansible.builtin.copy:
             mode: "666"
@@ -99,6 +109,8 @@
           community.general.docker_image:
             name: "localhost:{{ registry_port }}/whanos-agent:latest"
             push: true
+            force_tag: true
+            force_source: true
             source: build
             build:
               path: "{{ agents_temp_dir.path }}"
@@ -106,7 +118,7 @@
           tags: docker
 
         - name: "Install Jenkins"
-          when: ansible_facts.services["jenkins.service"] is not defined or ansible_facts.services["jenkins.service"].state != "running"
+          #when: ansible_facts.services["jenkins.service"] is not defined or ansible_facts.services["jenkins.service"].state != "running"
           tags: jenkins
           block:
             - name: Install Java
@@ -156,13 +168,13 @@
                 mode: "644"
               tags: jenkins
 
-            - name: "Create secrets directory"
-              ansible.builtin.file:
-                path: "{{ jenkins_path }}/secrets"
-                state: directory
-                owner: "jenkins"
-                group: "jenkins"
-                mode: "755"
+            # - name: "Create secrets directory"
+            #   ansible.builtin.file:
+            #     path: "{{ jenkins_path }}/secrets"
+            #     state: directory
+            #     owner: "jenkins"
+            #     group: "jenkins"
+            #     mode: "755"
 
             - name: "Upload admin password"
               ansible.builtin.copy:
@@ -174,11 +186,19 @@
 
             - name: "Upload github ssh key"
               ansible.builtin.copy:
-                content: "{{ jenkins_github_ssh_key }}"
+                content: "{{ jenkins_github_ssh_key | b64decode }}"
                 dest: "{{ jenkins_path }}/secrets/github_ssh_key"
                 owner: "jenkins"
                 group: "jenkins"
                 mode: "440"
+
+            - name: "Write token to file"
+              ansible.builtin.copy:
+                content: "{{ create_k8s_token }}"
+                dest: "{{ jenkins_path }}/secrets/k8s_token"
+                owner: jenkins
+                group: jenkins
+                mode: 440
 
             # - name: "Create Jenkins plugins directory"
             #   ansible.builtin.file:
@@ -197,7 +217,6 @@
               tags: jenkins
               become: true
               changed_when: false
-              become_user: jenkins
 
             - name: "Install Jenkins Plugins using Plugin Installation Manager"
               ansible.builtin.shell: |
@@ -205,7 +224,6 @@
               tags: jenkins
               become: true
               changed_when: false
-              become_user: jenkins
 
             - name: Create Jenkins service drop-in directory
               ansible.builtin.file:
@@ -225,6 +243,11 @@
                 mode: '0644'
               tags: jenkins
 
+            - name: Reload systemd
+              ansible.builtin.systemd:
+                daemon_reload: yes
+              tags: jenkins
+
             - name: Restart Jenkins
               ansible.builtin.service:
                 name: jenkins
@@ -235,18 +258,6 @@
                 CASC_JENKINS_CONFIG: "{{ jenkins_path }}/host/my_marvin.yml"
                 ADMIN_PASSWORD_FILE: "{{ jenkins_path }}/secrets/admin_password"
                 GITHUB_SSH_KEY_FILE: "{{ jenkins_path }}/secrets/github_ssh_key"
+                K8S_TOKEN_FILE: "{{ jenkins_path }}/secrets/k8s_token"
                 REGISTRY_PORT: "{{ registry_port }}"
                 DOCKER_OPTS: "--insecure-registry=localhost:{{ registry_port }}"
-
-    - name: "Check if kubectl is already installed"
-      ansible.builtin.stat:
-        path: "/usr/local/bin/kubectl"
-      register: kubectl_installed
-      tags: k8s
-
-- name: "Install kubernetes"
-  ansible.builtin.import_playbook: kubernetes.yml
-  when: not kubectl_installed.stat.exists
-
-# - name: "Starting kubernetes"
-#   ansible.builtin.import_playbook: kubespray.yml

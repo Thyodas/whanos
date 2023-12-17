@@ -69,6 +69,21 @@ freeStyleJob('link-project') {
                 triggers {
                     scm("H * * * *")
                 }
+                wrappers {
+                    multiKubectlBuildWrapper {
+                        kubectlCredentials {
+                            kubectlCredential {
+                                clusterName("cluster.local")
+                                contextName("kubernetes-admin@cluster.local")
+                                credentialsId("kubernetes_token")
+                                namespace("jenkins")
+                                serverUrl("https://172.17.0.1:6443")
+                            }
+                        }
+                        restrictKubeConfigAccess(false)
+                    }
+                }
+
                 steps {
                     shell("echo DETECTED_LANGUAGE=`/app/detect-language .` >> /app/env")
                     environmentVariables {
@@ -106,7 +121,7 @@ freeStyleJob('link-project') {
                             fileExists('whanos.yml', BaseDir.WORKSPACE)
                         }
                         steps {
-                            shell("helm upgrade -if whanos.yml '\$DISPLAY_NAME' /app/helm/deployment --set image.image='whanos-\$DISPLAY_NAME-project' --set image.name='\$DISPLAY_NAME-name'")
+                            shell("helm upgrade -if whanos.yml '\$DISPLAY_NAME' /app/helm/deployment --set image.image='localhost:5001/whanos-\$DISPLAY_NAME-project' --set image.name='\$DISPLAY_NAME-name'")
                         }
                     }
                 }
